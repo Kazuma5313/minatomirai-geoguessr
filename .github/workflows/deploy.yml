@@ -1,0 +1,41 @@
+# main に push すると GitHub Pages に公開する。
+# APIキーはリポジトリには置かず、Settings → Secrets and variables → Actions に登録した値を
+# 公開用の config.js に差し込む（tools/build_site.py）。
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build site (inject secrets into config.js)
+        env:
+          GOOGLE_MAPS_KEY: ${{ secrets.GOOGLE_MAPS_KEY }}
+          FIREBASE_CONFIG: ${{ secrets.FIREBASE_CONFIG }}
+          APPCHECK_SITE_KEY: ${{ secrets.APPCHECK_SITE_KEY }}
+          APPCHECK_PROVIDER: ${{ vars.APPCHECK_PROVIDER }}
+          APP_NAME: ${{ vars.APP_NAME }}
+        run: python3 tools/build_site.py
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,8 @@
+.DS_Store
+*.log
+__pycache__/
+# 公開用に生成するフォルダ（Actions が作る）
+site/
+# 写真候補の収集結果（作業用）
+tools/cands.json
+tools/extra.json

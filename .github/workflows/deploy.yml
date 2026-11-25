@@ -18,11 +18,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  # 1) 公開用ファイルを作る（Secrets のキーを config.js に差し込む）
+  build:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
       - name: Build site (inject secrets into config.js)
@@ -37,5 +35,14 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
+
+  # 2) 公開する。作る工程と分けておくと、ファイルが見つからずに失敗することがない
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - id: deployment
         uses: actions/deploy-pages@v4

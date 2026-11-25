@@ -18,13 +18,30 @@ const MM_POLY = [
   [35.4528, 139.6452], [35.4513, 139.6402], [35.4500, 139.6322], [35.4506, 139.6294], [35.4560, 139.6268], [35.4612, 139.6236],
 ];
 const MOVE_LABEL = { move: '歩いて探せる', nomove: '見回すだけ', nmpz: '固定（見回しもズームもなし）' };
-const RANKS = [
-  [22000, 'みなとみらいの主（ぬし）', '地図を見なくても歩けるレベル。今度は友だちの案内役をお願いします。'],
-  [17000, 'ベイエリア通', 'かなり詳しい！ 次は全問5000点を狙ってみてください。'],
-  [12000, 'MM散歩 上級者', '主要スポットはばっちり。少し奥の公園や橋にも行ってみよう。'],
-  [7000,  '週末みなとみらい民', 'だいたいの方向はつかめています。図鑑を埋めながら覚えていこう。'],
-  [0,     'はじめてのみなとみらい', 'ここから覚えればOK。図鑑のスポットを実際に歩いてみてください。'],
+// ---- 点数のしくみ ----
+// 1問：20m以内は満点5000点。そこから160m離れるごとに約0.37倍（みなとみらい約2km四方に合わせた曲線）。
+// 想定（5問合計の中央値・シミュレーション）：適当に置く 約1,100／地区だけ分かる 約10,000／だいたい分かる 約18,000／よく知ってる 約23,700
+const PERFECT_M = 20, SCALE_M = 160;
+// 1問ごとの判定（距離で決まる。点数の目安つき）
+const GRADES = [
+  { max: 20,       name: 'ピタリ！',     short: 'ピタリ',   cls: 'g-s' },
+  { max: 60,       name: 'すぐそば！',   short: '〜60m',   cls: 'g-a' },
+  { max: 150,      name: '近い！',       short: '〜150m',  cls: 'g-b' },
+  { max: 300,      name: '同じブロック', short: '〜300m',  cls: 'g-c' },
+  { max: 600,      name: '同じ地区',     short: '〜600m',  cls: 'g-d' },
+  { max: Infinity, name: 'はずれ…',     short: '600m〜',  cls: 'g-e' },
 ];
+// 5問合計のランク。B以上でクリア
+const RANKS = [
+  { min: 22000, letter: 'S', title: 'みなとみらいの主（ぬし）', msg: '地図を見なくても歩けるレベル。今度は友だちの案内役をお願いします。' },
+  { min: 17000, letter: 'A', title: 'ベイエリア通', msg: 'かなり詳しい！ ピタリを増やしてSランクを狙おう。' },
+  { min: 11000, letter: 'B', title: 'MM散歩 上級者', msg: 'クリア！ 主要スポットはばっちり。少し奥の公園や橋にも行ってみよう。' },
+  { min: 5000,  letter: 'C', title: '週末みなとみらい民', msg: '方向はつかめています。図鑑と「まちガイド」で地区の位置を覚えよう。' },
+  { min: 0,     letter: 'D', title: 'はじめてのみなとみらい', msg: 'ここから覚えればOK。まずは「名所めぐり」で街の地図をつかもう。' },
+];
+const CLEAR_SCORE = 11000;
+const rankOf = total => RANKS.find(r => total >= r.min);
+const gradeOf = d => GRADES.find(g => d <= g.max);
 
 const $ = id => document.getElementById(id);
 const body = document.body;
@@ -54,17 +71,8 @@ function haversine(a, b) {
   const h = Math.sin(dLat / 2) ** 2 + Math.cos(toR(a.lat)) * Math.cos(toR(b.lat)) * Math.sin(dLng / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(h));
 }
-// 15m以内は満点。そこから250mごとに約1/e。みなとみらい（約2km四方）の広さに合わせた曲線。
-function scoreOf(d) { return d <= 15 ? MAXP : Math.round(MAXP * Math.exp(-(d - 15) / 250)); }
-function rating(score, guessed) {
-  if (!guessed) return '時間切れ…';
-  if (score >= 4800) return 'PERFECT!!';
-  if (score >= 4000) return 'すばらしい！';
-  if (score >= 2800) return 'いい線いってる';
-  if (score >= 1500) return 'おしい！';
-  if (score >= 500) return 'まだまだ';
-  return '迷子かも…';
-}
+function scoreOf(d) { return d <= PERFECT_M ? MAXP : Math.round(MAXP * Math.exp(-(d - PERFECT_M) / SCALE_M)); }
+function rating(r) { return r.guess ? gradeOf(r.dist).name : '時間切れ…'; }
 function inPoly(p, poly = MM_POLY) {
   let inside = false;
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
@@ -488,20 +496,31 @@ const THEMES = {
 const inTheme = (spot, theme) => theme === 'random' || spot.themes.includes(theme);
 const spotDiff = id => { const d = PHOTOS.filter(p => p.spot === id).map(p => p.diff); return d.length ? Math.min(...d) : 2; };
 
-// 出題を5つ選ぶ。同じスポットは1ゲーム1回まで。やさしい問題から順に並べる
+// ---- 出題の履歴：最近出たスポット・写真ほど後回しにする（全部ひと通り出るまで同じものは出にくい） ----
+const Seen = {
+  get() { return store.get('seen', {}); },
+  mark(ids) {
+    const s = this.get(), t = Date.now();
+    ids.filter(Boolean).forEach(id => { s[id] = t; });
+    const keys = Object.keys(s);
+    if (keys.length > 400) keys.sort((x, y) => s[x] - s[y]).slice(0, keys.length - 400).forEach(k => delete s[k]); // 古い記録は捨てる
+    store.set('seen', s);
+  },
+  // 出ていないもの → 古いもの の順。同じ順位どうしはランダム
+  order(list, key) { const s = this.get(); return shuffle(list).sort((a, b) => (s[key(a)] || 0) - (s[key(b)] || 0)); },
+};
+
+// 出題を5つ選ぶ。同じスポットは1ゲーム1回まで。最近出ていないものを優先し、やさしい問題から順に並べる
 function pickRounds(theme, useSV) {
   if (useSV && theme !== 'random') {
-    // ストリートビュー：テーマのスポットから選び、その近くの景色で出題（写真がない企業も出せる）
-    return shuffle(window.MM_SPOTS.filter(s => inTheme(s, theme))).slice(0, ROUNDS)
+    // ストリートビュー：テーマのスポットから選び、その周りのランダムな地点の景色で出題（写真がない企業も出せる）
+    return Seen.order(window.MM_SPOTS.filter(s => inTheme(s, theme)), s => s.id).slice(0, ROUNDS)
       .sort((a, b) => spotDiff(a.id) - spotDiff(b.id))
       .map(s => { const ph = closestPhotoOf(s.id, s) || null; return { spot: s, photo: ph, base: ph, answer: { lat: s.lat, lng: s.lng }, spotMode: true }; });
   }
-  const pick = [], used = new Set();
-  for (const p of shuffle(PHOTOS.filter(p => inTheme(SPOTS[p.spot], theme)))) {
-    if (pick.length >= ROUNDS) break;
-    if (!used.has(p.spot)) { used.add(p.spot); pick.push(p); }
-  }
-  return pick.sort((a, b) => a.diff - b.diff)
+  const spots = Seen.order(window.MM_SPOTS.filter(s => inTheme(s, theme) && PHOTOS.some(p => p.spot === s.id)), s => s.id).slice(0, ROUNDS);
+  return spots.map(s => Seen.order(PHOTOS.filter(p => p.spot === s.id), p => p.id)[0])
+    .sort((a, b) => a.diff - b.diff)
     .map(p => ({ spot: SPOTS[p.spot], photo: p, base: p, answer: { lat: p.lat, lng: p.lng }, wantRandom: useSV && theme === 'random' }));
 }
 function replacementFor(rounds) {
@@ -578,7 +597,13 @@ async function startRound() {
         const near = nearestSpot(sv);
         Object.assign(r, { random: true, spot: near.spot, spotDist: near.d, photo: closestPhotoOf(near.spot.id, sv) });
       }
-    } else sv = await SV.find(r.answer);
+    } else {
+      // 毎回ちがう景色にするため、スポットから40〜110mずらした地点の近くを探す（遠くなりすぎたらスポットの近くで探し直す）
+      const ang = Math.random() * Math.PI * 2, off = 40 + Math.random() * 70;
+      const start = { lat: r.answer.lat + off * Math.sin(ang) / 111320, lng: r.answer.lng + off * Math.cos(ang) / (111320 * Math.cos(r.answer.lat * Math.PI / 180)) };
+      sv = await SV.find(start);
+      if (!sv || haversine(sv, r.spot) > 170) sv = await SV.find(r.answer);
+    }
   }
   if (G !== game) return;
   body.classList.toggle('nmpz', !!sv && G.move === 'nmpz');
@@ -586,6 +611,7 @@ async function startRound() {
   if (sv) { r.sv = sv; r.answer = { lat: sv.lat, lng: sv.lng }; body.classList.add('sv'); SV.show(sv.pano, G.move); }
   else { body.classList.remove('sv'); if (r.random || r.spotMode) resetToPhoto(r); await ensurePhoto(r); }
   if (G !== game) return;
+  Seen.mark([r.spot.id, r.photo && !r.sv ? r.photo.id : null, r.sv && r.sv.pano]);
   $('loader').classList.remove('on');
 
   // ラウンド開始の演出
@@ -676,7 +702,8 @@ async function submitGuess(timeout = false) {
   await sleep(120); if (!alive()) return;
   body.classList.add('card-in');
   await sleep(reduced ? 0 : 420); if (!alive()) return;
-  const rt = $('rvRating'); rt.textContent = rating(r.score, !!r.guess); rt.classList.remove('pop'); void rt.offsetWidth; rt.classList.add('pop');
+  const rt = $('rvRating'); rt.textContent = rating(r) + (r.hint ? '（ヒント使用）' : '');
+  paintGradeMeter(r); rt.classList.remove('pop'); void rt.offsetWidth; rt.classList.add('pop');
   const [dv, du] = r.guess ? fmtDist(r.dist) : ['—', ''];
   $('rvDistUnit').textContent = du;
   const bar = $('rvBar');
@@ -697,6 +724,28 @@ function setImg(img, photo, alt) {
   img.hidden = !photo;
   if (photo) { img.src = photo.src; img.alt = alt; } else img.removeAttribute('src');
 }
+function paintGradeMeter(r) {
+  const box = $('rvGrades'), g = r.guess ? gradeOf(r.dist) : null;
+  box.textContent = '';
+  GRADES.forEach(x => { const s = document.createElement('span'); s.textContent = x.short; if (x === g) s.className = 'on'; box.append(s); });
+}
+function renderRules() {
+  const fmt = n => n.toLocaleString();
+  const gRows = GRADES.map(g => {
+    const pt = g.max === Infinity ? '133点未満' : g.max <= PERFECT_M ? '5,000点' : `${fmt(scoreOf(g.max))}点以上`;
+    return `<tr><td>${g.name}</td><td>${g.max === Infinity ? '600mより遠い' : g.max + 'm以内'}</td><td>${pt}</td></tr>`;
+  }).join('');
+  const rRows = RANKS.map(r => `<tr><td><b>${r.letter}</b></td><td>${r.title}</td><td>${fmt(r.min)}点以上</td></tr>`).join('');
+  $('rulesBody').innerHTML = `
+    <p>1ゲーム5問。ピンと正解の<b>距離</b>だけで点数が決まります（1問最大5,000点）。</p>
+    <h3>1問ごとの判定</h3>
+    <table><tr><th>判定</th><th>正解からの距離</th><th>点数</th></tr>${gRows}</table>
+    <p class="note">20mを過ぎると、160m離れるごとに点数が約0.37倍になります。ヒントを使った問題は7割の点数です。</p>
+    <h3>5問合計のランク</h3>
+    <table><tr><th>ランク</th><th>称号</th><th>合計</th></tr>${rRows}</table>
+    <p class="note"><b>Bランク（${fmt(CLEAR_SCORE)}点）以上でクリア。</b>目安：適当に置くと約1,000点、地区だけ分かると約10,000点、だいたい分かると約18,000点、よく知っていると約23,000点。</p>`;
+}
+function openRules() { renderRules(); openModal('rulesModal'); Snd.init(); Snd.click(); }
 function fillReveal(r) {
   const s = r.spot;
   setImg($('rvImg'), r.photo, s.name);
@@ -780,11 +829,18 @@ function openSpot(id) {
 let finalMap = null;
 async function showFinal() {
   setPhase('final');
-  const total = G.total, bk = 'best.' + G.theme, best = store.get(bk, 0), isBest = total > best;
+  const total = G.total, bk = 'best2.' + G.theme, best = store.get(bk, 0), isBest = total > best;
   if (isBest) store.set(bk, total);
-  const rk = RANKS.find(r => total >= r[0]);
-  $('finalRank').innerHTML = ''; $('finalRank').append(rk[1]);
-  const sm = document.createElement('small'); sm.textContent = rk[2]; $('finalRank').append(sm);
+  const rk = rankOf(total), clear = total >= CLEAR_SCORE;
+  $('finalRank').innerHTML = ''; $('finalRank').append(rk.title);
+  const sm = document.createElement('small'); sm.textContent = rk.msg; $('finalRank').append(sm);
+  const L = $('finalLetter'); L.textContent = rk.letter; L.className = 'final-letter r-' + rk.letter;
+  const fc = $('finalClear'); fc.className = 'final-clear ' + (clear ? 'ok' : 'ng');
+  fc.textContent = clear ? 'クリア！' : `クリアまであと ${(CLEAR_SCORE - total).toLocaleString()} 点`;
+  const up = RANKS.slice().reverse().find(r => r.min > total);
+  const pitari = G.rounds.filter(r => r.guess && r.dist <= PERFECT_M).length;
+  $('finalNext').textContent = (up ? `${up.letter}ランクまであと ${(up.min - total).toLocaleString()} 点` : '最高ランク達成！') + `　ピタリ ${pitari}/5`;
+  const rb = store.get('rank.' + G.theme, ''); if (!rb || 'SABCD'.indexOf(rk.letter) < 'SABCD'.indexOf(rb)) store.set('rank.' + G.theme, rk.letter);
   const tn = THEMES[G.theme].name;
   $('finalBest').textContent = isBest ? (best ? `「${tn}」自己ベスト更新！（前回 ${best.toLocaleString()}）` : `「${tn}」はじめての記録！`) : `「${tn}」自己ベスト ${best.toLocaleString()}`;
   updateBest();
@@ -819,14 +875,15 @@ async function showFinal() {
   $('finalScore').textContent = '0';
   await sleep(300);
   await countUp($('finalScore'), total, 1800, undefined, () => Snd.tick());
+  $('finalLetter').classList.add('show'); Snd.stamp();
   if (total >= 17000) { Snd.great(); Confetti.burst(260); } else Snd.good();
 }
 
 function shareText() {
-  const sq = s => s >= 4000 ? '🟩' : s >= 2000 ? '🟨' : s >= 500 ? '🟧' : '🟥';
-  const rk = RANKS.find(r => G.total >= r[0])[1];
+  const sq = r => !r.guess ? '⬛' : r.dist <= 60 ? '🟩' : r.dist <= 150 ? '🟨' : r.dist <= 300 ? '🟧' : '🟥';
+  const rkObj = rankOf(G.total), rk = `${rkObj.letter}ランク・${rkObj.title}${G.total >= CLEAR_SCORE ? '・クリア' : ''}`;
   const mode = THEMES[G.theme].name + (G.useSV ? `・ストリートビュー（${MOVE_LABEL[G.move]}）` : '・写真');
-  return `${CONFIG.appName} みなとみらいジオゲッサー（${mode}）\n${G.total.toLocaleString()} / 25,000点「${rk}」\n${G.rounds.map(r => sq(r.score)).join('')}`;
+  return `${CONFIG.appName} みなとみらいジオゲッサー（${mode}）\n${G.total.toLocaleString()} / 25,000点「${rk}」\n${G.rounds.map(r => sq(r)).join('')}`;
 }
 async function copyShare() {
   const t = shareText();
@@ -847,8 +904,9 @@ function setPhase(p) {
 }
 function updateBest() {
   document.querySelectorAll('.theme').forEach(b => {
-    const v = store.get('best.' + b.dataset.theme, 0);
-    b.querySelector('.t-best').textContent = v ? `ベスト ${v.toLocaleString()}` : '';
+    const v = store.get('best2.' + b.dataset.theme, 0);
+    const rk = store.get('rank.' + b.dataset.theme, '');
+    b.querySelector('.t-best').textContent = v ? `ベスト ${v.toLocaleString()}${rk ? '・' + rk + 'ランク' : ''}${v >= CLEAR_SCORE ? '・クリア済み' : ''}` : '';
   });
   $('randomDesc').innerHTML = apiKey() ? 'ストリートビューで<br>街のどこかへ。上級者向け' : 'すべての写真から出題。<br>上級者向け';
 }
@@ -919,6 +977,8 @@ document.querySelectorAll('.theme').forEach(b => b.addEventListener('click', () 
 $('againBtn').addEventListener('click', () => startGame(G ? G.theme : lastTheme));
 $('homeBtn').addEventListener('click', () => { Snd.click(); setPhase('title'); });
 $('shareBtn').addEventListener('click', copyShare);
+$('rulesBtn').addEventListener('click', openRules);
+$('rulesBtn2').addEventListener('click', openRules);
 $('dexBtn').addEventListener('click', () => { Snd.init(); Snd.click(); openDex(); });
 $('settingsBtn').addEventListener('click', () => { Snd.init(); Snd.click(); openSettings(); });
 $('guessBtn').addEventListener('click', () => submitGuess());
@@ -956,7 +1016,7 @@ addEventListener('keydown', e => {
 
 // ===================== 起動 =====================
 // 動作確認用（コンソールから __mmg.G や __mmg.map を見られる）
-window.__mmg = { get G() { return G; }, map, SV, guess: (lat, lng) => placeGuess({ lat, lng }) };
+window.__mmg = { get G() { return G; }, map, SV, Seen, guess: (lat, lng) => placeGuess({ lat, lng }) };
 document.title = `${CONFIG.appName}｜みなとみらいジオゲッサー`;
 $('logo').textContent = CONFIG.appName; $('logo').setAttribute('aria-label', CONFIG.appName);
 splitLogo();

@@ -84,6 +84,9 @@
 | photos/p73.jpg | 富士フイルムビジネスイノベーション 横浜みなとみらい事業所 | Thirteen-fri | CC BY-SA 3.0 | [Commons](https://commons.wikimedia.org/wiki/File:Fujixerox_R%26D_-_Takashima_Suisaisen_Park.jpg) |
 | photos/p74.jpg | 富士フイルムビジネスイノベーション 横浜みなとみらい事業所 | Maksym Grinenko | CC0 | [Commons](https://commons.wikimedia.org/wiki/File:FujiXeroxBuilding.jpg) |
 | photos/p75.jpg | 富士フイルムビジネスイノベーション 横浜みなとみらい事業所 | Thirteen-fri | CC BY-SA 3.0 | [Commons](https://commons.wikimedia.org/wiki/File:Minatomirai_21_bulding_-_fujixero%26nissan%26mitsui.jpg) |
+| photos/p76.jpg | オーケー本社（オーケーみなとみらい） | Thirteen-fri | CC BY-SA 4.0 | [Commons](https://commons.wikimedia.org/wiki/File:OK_Minatomirai_01b.jpg) |
+| photos/p77.jpg | みなとみらいグランドセントラルタワー | Thirteen-fri | CC BY-SA 4.0 | [Commons](https://commons.wikimedia.org/wiki/File:MM_-_Grand_Central_Tower_P3R.jpg) |
+| photos/p78.jpg | シンクロン本社ビル | Thirteen-fri | CC BY-SA 4.0 | [Commons](https://commons.wikimedia.org/wiki/File:Shincron_II_-_01b.JPG) |
 
 ## 地図
 

@@ -419,3 +419,31 @@ body.revealing .dock-3d{display:none}
   .v3-pip{width:44vw;bottom:calc(84px + var(--safe-b))}
   .v3-guess{left:12px;right:12px;bottom:calc(12px + var(--safe-b))}
 }
+
+/* ---------- 判定・ランク ---------- */
+.rv-grades{display:grid;grid-template-columns:repeat(6,1fr);gap:3px;margin-top:10px}
+.rv-grades span{font-family:Outfit;font-size:10.5px;font-weight:700;text-align:center;padding:4px 0;border-radius:6px;background:rgba(255,255,255,.06);color:var(--dim);transition:.3s}
+.rv-grades span.on{color:#1b0a12;background:var(--grad);transform:scale(1.08);box-shadow:0 4px 14px rgba(255,140,90,.45)}
+.final-head{display:flex;align-items:center;gap:18px;margin-top:6px}
+.final-letter{flex:none;width:92px;height:92px;border-radius:24px;display:grid;place-items:center;font-family:Outfit;font-weight:900;font-size:62px;color:#1b0a12;
+  background:var(--grad);box-shadow:0 12px 36px rgba(255,120,100,.45);transform:scale(.2) rotate(-20deg);opacity:0}
+.final-letter.show{animation:stampIn .7s var(--spring) forwards}
+.final-letter.r-S{background:linear-gradient(135deg,#ffe58a,#ffb13b,#ff6fa8)}
+.final-letter.r-C,.final-letter.r-D{background:linear-gradient(135deg,#9fb0cc,#5d6f8f);color:#fff;box-shadow:none}
+@keyframes stampIn{to{transform:rotate(-6deg);opacity:1}}
+.final-head .final-total{margin-top:0}
+.final-clear{margin:4px 0 0;font-weight:900;font-size:15px}
+.final-clear.ok{color:var(--mint)}.final-clear.ng{color:var(--dim)}
+.final-next{margin:4px 0 0;color:var(--dim);font-size:13px}
+.rules{width:min(620px,100%)}
+.rules-body{padding:0 26px 26px;font-size:14px;line-height:1.8}
+.rules-body h3{font-size:15px;margin:16px 0 6px;color:var(--cyan)}
+.rules-body table{width:100%;border-collapse:collapse;font-size:13.5px}
+.rules-body td,.rules-body th{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left}
+.rules-body th{color:var(--dim);font-weight:700;font-size:12px}
+.rules-body td b{font-family:Outfit}
+.rules-body .note{color:var(--dim);font-size:12.5px}
+.final-head .final-total{flex-wrap:nowrap;white-space:nowrap}
+.final-head .final-total b{font-size:58px}
+.final-head .final-total span{font-size:15px}
+@media (max-width:760px){.final-letter{width:72px;height:72px;font-size:48px;border-radius:20px}.final-head .final-total b{font-size:46px}}

@@ -834,5 +834,38 @@
 "author": "Thirteen-fri",
 "license": "CC BY-SA 3.0",
 "page": "https://commons.wikimedia.org/wiki/File:Minatomirai_21_bulding_-_fujixero%26nissan%26mitsui.jpg"
+},
+{
+"id": "p76",
+"src": "photos/p76.jpg",
+"spot": "okhq",
+"lat": 35.462086,
+"lng": 139.629944,
+"diff": 2,
+"author": "Thirteen-fri",
+"license": "CC BY-SA 4.0",
+"page": "https://commons.wikimedia.org/wiki/File:OK_Minatomirai_01b.jpg"
+},
+{
+"id": "p77",
+"src": "photos/p77.jpg",
+"spot": "grandcentral",
+"lat": 35.458467,
+"lng": 139.630111,
+"diff": 3,
+"author": "Thirteen-fri",
+"license": "CC BY-SA 4.0",
+"page": "https://commons.wikimedia.org/wiki/File:MM_-_Grand_Central_Tower_P3R.jpg"
+},
+{
+"id": "p78",
+"src": "photos/p78.jpg",
+"spot": "syncron",
+"lat": 35.460522,
+"lng": 139.624908,
+"diff": 2,
+"author": "Thirteen-fri",
+"license": "CC BY-SA 4.0",
+"page": "https://commons.wikimedia.org/wiki/File:Shincron_II_-_01b.JPG"
 }
 ]

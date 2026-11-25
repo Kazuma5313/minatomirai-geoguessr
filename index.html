@@ -40,6 +40,7 @@
     </div>
     <div class="sub-actions">
       <button class="btn-ghost" id="dexBtn">スポット図鑑 <b id="dexCount">0/0</b></button>
+      <button class="btn-ghost" id="rulesBtn">点数のしくみ</button>
       <button class="btn-ghost" id="settingsBtn">設定</button>
     </div>
       </div>
@@ -90,6 +91,7 @@
         <div><small>スコア</small><b id="rvScore">0</b><span>/5000</span></div>
       </div>
       <div class="rv-bar"><i id="rvBar"></i></div>
+      <div class="rv-grades" id="rvGrades" aria-label="距離の判定"></div>
     </div>
     <div class="rv-card">
       <div class="rv-new" id="rvNew">図鑑に登録！</div>
@@ -128,14 +130,22 @@
   <div class="final-map" id="finalMap"></div>
   <div class="final-panel">
     <p class="eyebrow">RESULT</p>
-    <div class="final-total"><b id="finalScore">0</b><span>/ 25,000</span></div>
+    <div class="final-head">
+      <div class="final-letter" id="finalLetter">B</div>
+      <div>
+        <div class="final-total"><b id="finalScore">0</b><span>/ 25,000</span></div>
+        <p class="final-clear" id="finalClear"></p>
+      </div>
+    </div>
     <p class="final-rank" id="finalRank"></p>
+    <p class="final-next" id="finalNext"></p>
     <p class="final-best" id="finalBest"></p>
     <ol class="final-list" id="finalList"></ol>
     <div class="final-actions">
       <button class="btn-primary" id="againBtn"><span>もう一回</span><i class="arrow"></i></button>
       <button class="btn-ghost" id="shareBtn">結果をコピー</button>
       <button class="btn-ghost" id="homeBtn">タイトルへ</button>
+      <button class="btn-ghost" id="rulesBtn2">点数のしくみ</button>
     </div>
   </div>
 </section>
@@ -173,6 +183,13 @@
     <button class="close" data-close>✕</button>
     <div id="lookPano"></div>
     <p class="look-cap" id="lookCap"></p>
+  </div>
+</div>
+
+<div class="modal" id="rulesModal" hidden>
+  <div class="modal-box rules">
+    <header><h2>点数のしくみ</h2><button class="close" data-close>✕</button></header>
+    <div class="rules-body" id="rulesBody"></div>
   </div>
 </div>
 

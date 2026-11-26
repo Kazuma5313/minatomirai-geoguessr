@@ -143,12 +143,35 @@
     <ol class="final-list" id="finalList"></ol>
     <div class="final-actions">
       <button class="btn-primary" id="againBtn"><span>もう一回</span><i class="arrow"></i></button>
-      <button class="btn-ghost" id="shareBtn">結果をコピー</button>
+      <button class="btn-card" id="shareBtn"><span>認定カードをひらく</span><small>SNSに貼れる画像</small></button>
       <button class="btn-ghost" id="homeBtn">タイトルへ</button>
       <button class="btn-ghost" id="rulesBtn2">点数のしくみ</button>
     </div>
   </div>
 </section>
+
+<!-- 認定証カード -->
+<div class="modal" id="cardModal" hidden>
+  <div class="modal-box card">
+    <header><h2>みなとみらい認定カード</h2><p>保存してSNSやLINEに送れます</p><button class="close" data-close>✕</button></header>
+    <div class="tcg-stage" id="tcgStage">
+      <div class="tcg" id="tcg">
+        <div class="tcg-burst"></div>
+        <div class="tcg-inner">
+          <div class="tcg-face tcg-back"><img id="cardBack" alt=""></div>
+          <div class="tcg-face tcg-front"><img id="cardImg" alt="ランクとスコアの認定カード"><i class="tcg-holo"></i><i class="tcg-glare"></i></div>
+        </div>
+      </div>
+      <i class="card-spin"></i>
+    </div>
+    <p class="tcg-rarity">レア度 <b id="cardRarity"></b><span>カードをなぞるとホロが動きます</span></p>
+    <div class="card-actions">
+      <button class="btn-primary" id="cardShare" hidden><span>画像をシェア</span></button>
+      <button class="btn-ghost" id="cardSave">画像を保存</button>
+      <button class="btn-ghost" id="cardCopy">文字でコピー</button>
+    </div>
+  </div>
+</div>
 
 <!-- ===== 図鑑 ===== -->
 <div class="modal" id="dexModal" hidden>

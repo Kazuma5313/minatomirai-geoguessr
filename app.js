@@ -33,11 +33,11 @@ const GRADES = [
 ];
 // 5問合計のランク。B以上でクリア
 const RANKS = [
-  { min: 22000, letter: 'S', title: 'みなとみらいの主（ぬし）', msg: '地図を見なくても歩けるレベル。今度は友だちの案内役をお願いします。' },
-  { min: 17000, letter: 'A', title: 'ベイエリア通', msg: 'かなり詳しい！ ピタリを増やしてSランクを狙おう。' },
-  { min: 11000, letter: 'B', title: 'MM散歩 上級者', msg: 'クリア！ 主要スポットはばっちり。少し奥の公園や橋にも行ってみよう。' },
-  { min: 5000,  letter: 'C', title: '週末みなとみらい民', msg: '方向はつかめています。図鑑と「まちガイド」で地区の位置を覚えよう。' },
-  { min: 0,     letter: 'D', title: 'はじめてのみなとみらい', msg: 'ここから覚えればOK。まずは「名所めぐり」で街の地図をつかもう。' },
+  { min: 22000, letter: 'S', lv: 5, title: 'みなとみらいの主（ぬし）', tag: '地図なしで街を案内できる', msg: '地図を見なくても歩けるレベル。今度は友だちの案内役をお願いします。' },
+  { min: 17000, letter: 'A', lv: 4, title: 'ベイエリアの達人', tag: '路地の先まで知っている', msg: 'かなり詳しい！ ピタリを増やしてSランクを狙おう。' },
+  { min: 11000, letter: 'B', lv: 3, title: 'みなとみらい一人前', tag: '主要スポットはおまかせ', msg: 'クリア！ 主要スポットはばっちり。少し奥の公園や橋にも行ってみよう。' },
+  { min: 5000,  letter: 'C', lv: 2, title: 'みなとみらい見習い', tag: '方向感覚はつかめてきた', msg: '方向はつかめています。図鑑と「まちガイド」で地区の位置を覚えよう。' },
+  { min: 0,     letter: 'D', lv: 1, title: 'みなとみらい迷子', tag: 'ここから街デビュー', msg: 'ここから覚えればOK。まずは「名所めぐり」で街の地図をつかもう。' },
 ];
 const CLEAR_SCORE = 11000;
 const rankOf = total => RANKS.find(r => total >= r.min);
@@ -735,7 +735,7 @@ function renderRules() {
     const pt = g.max === Infinity ? '133点未満' : g.max <= PERFECT_M ? '5,000点' : `${fmt(scoreOf(g.max))}点以上`;
     return `<tr><td>${g.name}</td><td>${g.max === Infinity ? '600mより遠い' : g.max + 'm以内'}</td><td>${pt}</td></tr>`;
   }).join('');
-  const rRows = RANKS.map(r => `<tr><td><b>${r.letter}</b></td><td>${r.title}</td><td>${fmt(r.min)}点以上</td></tr>`).join('');
+  const rRows = RANKS.map(r => `<tr><td><b>${r.letter}</b></td><td>Lv.${r.lv} ${r.title}</td><td>${fmt(r.min)}点以上</td></tr>`).join('');
   $('rulesBody').innerHTML = `
     <p>1ゲーム5問。ピンと正解の<b>距離</b>だけで点数が決まります（1問最大5,000点）。</p>
     <h3>1問ごとの判定</h3>
@@ -844,6 +844,7 @@ async function showFinal() {
   const tn = THEMES[G.theme].name;
   $('finalBest').textContent = isBest ? (best ? `「${tn}」自己ベスト更新！（前回 ${best.toLocaleString()}）` : `「${tn}」はじめての記録！`) : `「${tn}」自己ベスト ${best.toLocaleString()}`;
   updateBest();
+  { const R = rarityOf(rk); $('shareBtn').dataset.r = R.code; $('shareBtn').querySelector('small').textContent = `${R.code} ${'★'.repeat(R.stars)} のカードをゲット`; }
 
   if (!finalMap) finalMap = MMMap.create($('finalMap'), { zoomCtrl: true, bounds: BOUNDS });
   finalMap.clear();
@@ -881,7 +882,7 @@ async function showFinal() {
 
 function shareText() {
   const sq = r => !r.guess ? '⬛' : r.dist <= 60 ? '🟩' : r.dist <= 150 ? '🟨' : r.dist <= 300 ? '🟧' : '🟥';
-  const rkObj = rankOf(G.total), rk = `${rkObj.letter}ランク・${rkObj.title}${G.total >= CLEAR_SCORE ? '・クリア' : ''}`;
+  const rkObj = rankOf(G.total), rk = `${rkObj.letter}ランク Lv.${rkObj.lv}・${rkObj.title}${G.total >= CLEAR_SCORE ? '・クリア' : ''}`;
   const mode = THEMES[G.theme].name + (G.useSV ? `・ストリートビュー（${MOVE_LABEL[G.move]}）` : '・写真');
   return `${CONFIG.appName} みなとみらいジオゲッサー（${mode}）\n${G.total.toLocaleString()} / 25,000点「${rk}」\n${G.rounds.map(r => sq(r)).join('')}`;
 }
@@ -894,6 +895,423 @@ async function copyShare() {
   }
   toast('結果をコピーしました');
 }
+
+// ===================== 認定証カード（トレカ風・SNSに貼れる画像） =====================
+// カード本体は 900×1260（トレカと同じ 5:7）。保存する画像は、カードを 1080×1350（SNS向け 4:5）の台紙に載せたもの。
+const TCG_W = 900, TCG_H = 1260, STAGE_W = 1080, STAGE_H = 1350;
+const GRADE_COLOR = { 'g-s': '#ffd25e', 'g-a': '#4fe3a3', 'g-b': '#3fd8ff', 'g-c': '#ff9a5b', 'g-d': '#ff5d8a', 'g-e': '#6c7c99' };
+// ランクごとのレア度。frame＝枠の金属色、sky＝イラストの空、holo＝ホロの強さ
+const RARITY = {
+  D: { code: 'N',   stars: 1, name: 'ノーマル',       frame: ['#e6ebf2', '#8b97ab', '#f4f6fa', '#6f7b90', '#d5dbe5'], accent: '#c3cede', ink: '#141b29',
+       panel: ['#1d2638', '#121927'], sky: ['#16223b', '#2f4466', '#56688a'], holo: 0 },
+  C: { code: 'R',   stars: 2, name: 'レア',           frame: ['#c9f0ff', '#2f7fe0', '#e6f8ff', '#1f55b5', '#8fd8ff'], accent: '#6fd0ff', ink: '#06183a',
+       panel: ['#0f2650', '#0a1631'], sky: ['#071a44', '#174a95', '#3d86c9'], holo: .22 },
+  B: { code: 'SR',  stars: 3, name: 'スーパーレア',   frame: ['#fff6c8', '#d99a26', '#ffe592', '#9c6410', '#ffd25e'], accent: '#ffd25e', ink: '#2b1700',
+       panel: ['#2a1d10', '#160f08'], sky: ['#1a1242', '#7a3b6a', '#f08a4b'], holo: .4 },
+  A: { code: 'SSR', stars: 4, name: 'ダブルスーパーレア', frame: ['#ffe0ef', '#ff4d7e', '#ffd25e', '#ff8a5b', '#ffb3d1'], accent: '#ff7fae', ink: '#2e0716',
+       panel: ['#2c0f2a', '#160818'], sky: ['#1b0838', '#6d1f6b', '#e2507a'], holo: .6 },
+  S: { code: 'UR',  stars: 5, name: 'アルティメットレア', frame: ['#ff6fa8', '#ffd25e', '#5cffb4', '#3fd8ff', '#a77bff', '#ff6fa8'], accent: '#ffe27a', ink: '#1a0b00',
+       panel: ['#1b1036', '#0b0820'], sky: ['#070420', '#2c1268', '#7a2fa0'], holo: .85, legend: true },
+};
+const rarityOf = rk => RARITY[rk.letter];
+const PUBLIC_URL = 'kazuma5313.github.io/minatomirai-geoguessr';
+function shareUrl() {
+  return location.protocol.startsWith('http') && !/^(localhost|127\.|\[::1\])/.test(location.hostname)
+    ? (location.host + location.pathname).replace(/\/(index\.html)?$/, '') : PUBLIC_URL;
+}
+const JP = '"Zen Kaku Gothic New", sans-serif', EN = 'Outfit, sans-serif';
+function rr(c, x, y, w, h, r) { c.beginPath(); c.roundRect(x, y, w, h, r); }
+function lin(c, x0, y0, x1, y1, stops) { const g = c.createLinearGradient(x0, y0, x1, y1); stops.forEach((s, i) => g.addColorStop(i / (stops.length - 1), s)); return g; }
+function fitFont(c, text, weight, family, size, maxW, min = 18) {
+  for (; size > min; size -= 2) { c.font = `${weight} ${size}px ${family}`; if (c.measureText(text).width <= maxW) break; }
+  return size;
+}
+function clip(c, text, maxW) {
+  if (c.measureText(text).width <= maxW) return text;
+  while (text.length > 1 && c.measureText(text + '…').width > maxW) text = text.slice(0, -1);
+  return text + '…';
+}
+function wrapLines(c, text, maxW, maxLines) {
+  const lines = []; let cur = '';
+  for (const ch of text) { if (c.measureText(cur + ch).width > maxW) { lines.push(cur); cur = ch; } else cur += ch; }
+  if (cur) lines.push(cur);
+  if (lines.length > maxLines) { lines.length = maxLines; lines[maxLines - 1] = clip(c, lines[maxLines - 1] + '…', maxW); }
+  return lines;
+}
+// 同じ結果なら同じ絵になる乱数
+function seeded(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function sparkle(c, x, y, r, col) {
+  c.save(); c.translate(x, y); c.fillStyle = col; c.beginPath();
+  for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4, l = i % 2 ? r * .22 : r; c.lineTo(Math.cos(a) * l, Math.sin(a) * l); }
+  c.closePath(); c.fill(); c.restore();
+}
+// 金属っぽい縞（枠用）
+function metal(c, x, y, w, h, cols) {
+  const g = c.createLinearGradient(x, y, x + w, y + h), n = cols.length * 3;
+  for (let i = 0; i <= n; i++) g.addColorStop(i / n, cols[i % cols.length]);
+  return g;
+}
+
+// イラスト：みなとみらいの夜景。レア度が上がるほど空と光が豪華になる
+function drawArt(c, x, y, w, h, R, rnd) {
+  c.save(); rr(c, x, y, w, h, 18); c.clip();
+  c.fillStyle = lin(c, 0, y, 0, y + h * .8, R.sky); c.fillRect(x, y, w, h);
+  // オーロラ（UR）
+  if (R.legend) {
+    c.globalCompositeOperation = 'lighter';
+    for (let k = 0; k < 3; k++) {
+      c.beginPath(); c.moveTo(x, y + h * (.18 + k * .08));
+      for (let i = 0; i <= 12; i++) c.lineTo(x + w * i / 12, y + h * (.18 + k * .08) + Math.sin(i * .9 + k) * 26);
+      c.lineTo(x + w, y); c.lineTo(x, y); c.closePath();
+      c.fillStyle = ['rgba(92,255,180,.12)', 'rgba(63,216,255,.10)', 'rgba(167,123,255,.12)'][k]; c.fill();
+    }
+    c.globalCompositeOperation = 'source-over';
+  }
+  // 星
+  const nStars = 30 + R.stars * 22;
+  for (let i = 0; i < nStars; i++) {
+    const sx = x + rnd() * w, sy = y + rnd() * h * .55, a = .3 + rnd() * .7;
+    c.fillStyle = `rgba(255,255,255,${a})`; c.fillRect(sx, sy, 2, 2);
+  }
+  for (let i = 0; i < R.stars; i++) sparkle(c, x + 40 + rnd() * (w - 80), y + 30 + rnd() * h * .35, 7 + rnd() * 6, 'rgba(255,255,255,.9)');
+  // 月
+  const mx = x + w * .12, my = y + h * .2;
+  const mg = c.createRadialGradient(mx, my, 0, mx, my, 90); mg.addColorStop(0, 'rgba(255,240,200,.45)'); mg.addColorStop(1, 'rgba(255,240,200,0)');
+  c.fillStyle = mg; c.fillRect(mx - 90, my - 90, 180, 180);
+  c.fillStyle = '#fff4d6'; c.beginPath(); c.arc(mx, my, 26, 0, Math.PI * 2); c.fill();
+  c.fillStyle = R.sky[0]; c.globalAlpha = .55; c.beginPath(); c.arc(mx + 11, my - 7, 23, 0, Math.PI * 2); c.fill(); c.globalAlpha = 1;
+  // 花火（SSR 以上）
+  if (R.stars >= 4) {
+    const cols = R.legend ? ['#ffd25e', '#5cffb4', '#3fd8ff', '#ff6fa8'] : ['#ffd25e', '#ff7fae'];
+    const n = R.legend ? 4 : 2;
+    c.globalCompositeOperation = 'lighter';
+    for (let f = 0; f < n; f++) {
+      const fx = x + w * (.38 + f * .17 + rnd() * .05), fy = y + h * (.14 + rnd() * .14), fr = 46 + rnd() * 34, col = cols[f % cols.length];
+      c.strokeStyle = col; c.lineWidth = 2.5;
+      for (let i = 0; i < 28; i++) {
+        const a = i / 28 * Math.PI * 2;
+        c.globalAlpha = .75; c.beginPath(); c.moveTo(fx + Math.cos(a) * fr * .3, fy + Math.sin(a) * fr * .3); c.lineTo(fx + Math.cos(a) * fr, fy + Math.sin(a) * fr); c.stroke();
+        c.fillStyle = col; c.beginPath(); c.arc(fx + Math.cos(a) * fr * 1.08, fy + Math.sin(a) * fr * 1.08, 2.4, 0, Math.PI * 2); c.fill();
+      }
+    }
+    c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
+  }
+  const base = y + h * .74;
+  // 街並み
+  const dark = '#070b16', win = R.stars >= 3 ? '#ffd98a' : '#bcd6ff';
+  const tower = (tx, tw, th) => {
+    c.fillStyle = dark; c.fillRect(tx, base - th, tw, th);
+    for (let wy = base - th + 10; wy < base - 6; wy += 11) for (let wx = tx + 5; wx < tx + tw - 5; wx += 9)
+      if (rnd() < .34) { c.fillStyle = win; c.globalAlpha = .35 + rnd() * .55; c.fillRect(wx, wy, 4, 5); }
+    c.globalAlpha = 1;
+  };
+  // 遠景のビル
+  c.fillStyle = 'rgba(10,16,32,.55)';
+  for (let i = 0; i < 16; i++) { const bw = 30 + rnd() * 40, bh = 40 + rnd() * 90; c.fillRect(x + rnd() * w, base - bh, bw, bh); }
+  // ランドマークタワー（段々に細く、上に灯り）
+  const lx = x + w * .14;
+  tower(lx, 92, h * .42); tower(lx + 8, 76, h * .52); tower(lx + 16, 60, h * .58);
+  c.fillStyle = dark; c.fillRect(lx + 34, base - h * .62, 24, h * .05);
+  c.fillStyle = '#ff4d5e'; c.beginPath(); c.arc(lx + 46, base - h * .625, 3.5, 0, Math.PI * 2); c.fill();
+  // クイーンズスクエア
+  tower(x + w * .3, 54, h * .36); tower(x + w * .3 + 58, 50, h * .31); tower(x + w * .3 + 112, 46, h * .26);
+  // コスモクロック（観覧車）
+  const cx = x + w * .62, cy = base - h * .25, cr = h * .21;
+  c.strokeStyle = dark; c.lineWidth = 7; c.beginPath(); c.moveTo(cx - cr * .45, base); c.lineTo(cx, cy); c.lineTo(cx + cr * .45, base); c.stroke();
+  c.lineWidth = 1.5; c.strokeStyle = 'rgba(255,255,255,.25)';
+  for (let i = 0; i < 30; i++) { const a = i / 30 * Math.PI * 2; c.beginPath(); c.moveTo(cx, cy); c.lineTo(cx + Math.cos(a) * cr, cy + Math.sin(a) * cr); c.stroke(); }
+  c.lineWidth = 4; c.strokeStyle = 'rgba(255,255,255,.55)'; c.beginPath(); c.arc(cx, cy, cr, 0, Math.PI * 2); c.stroke();
+  for (let i = 0; i < 60; i++) {
+    const a = i / 60 * Math.PI * 2;
+    c.fillStyle = R.stars >= 3 ? `hsl(${i * 6} 95% 68%)` : (i % 2 ? '#7fd3ff' : '#ffffff');
+    c.beginPath(); c.arc(cx + Math.cos(a) * cr, cy + Math.sin(a) * cr, 2.6, 0, Math.PI * 2); c.fill();
+  }
+  c.font = `800 ${Math.round(cr * .3)}px ${EN}`; c.fillStyle = R.stars >= 3 ? '#ffe27a' : '#cfe6ff'; c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.fillText('21:00', cx, cy);
+  // インターコンチネンタル（帆の形）
+  const hx = x + w * .8;
+  c.fillStyle = dark; c.beginPath(); c.moveTo(hx, base); c.quadraticCurveTo(hx + 10, base - h * .36, hx + 70, base - h * .4);
+  c.quadraticCurveTo(hx + 96, base - h * .2, hx + 120, base); c.closePath(); c.fill();
+  for (let i = 0; i < 9; i++) { c.fillStyle = win; c.globalAlpha = .55; c.fillRect(hx + 30 + i * 8, base - h * .3 + i * 12, 30, 2); }
+  c.globalAlpha = 1;
+  // 海と映り込み
+  c.fillStyle = lin(c, 0, base, 0, y + h, ['#0a1430', '#03060f']); c.fillRect(x, base, w, y + h - base);
+  c.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < 70; i++) {
+    const rx = x + rnd() * w, ry = base + 6 + rnd() * (y + h - base - 10), rw = 10 + rnd() * 40;
+    c.fillStyle = rnd() < .5 ? `rgba(255,217,138,${.12 + rnd() * .2})` : `rgba(127,211,255,${.1 + rnd() * .2})`;
+    c.fillRect(rx, ry, rw, 2);
+  }
+  c.globalCompositeOperation = 'source-over';
+  c.fillStyle = 'rgba(255,255,255,.18)'; c.fillRect(x, base, w, 1.5);
+  c.restore();
+}
+
+// ホロ加工（虹色の斜めの帯＋きらめき）。枠とイラストは強く、文字の欄はうっすら
+function holoFill(c, x, y, w, h, R) {
+  const g = c.createLinearGradient(x, y, x + w, y + h);
+  const hues = R.code === 'R' ? [200, 220, 190, 230] : R.code === 'SR' ? [40, 55, 30, 50] : [330, 45, 150, 200, 270, 330];
+  for (let i = 0; i <= 24; i++) g.addColorStop(i / 24, `hsl(${hues[i % hues.length]} 100% ${i % 2 ? 75 : 45}%)`);
+  return g;
+}
+function drawHolo(c, W, H, P, art, R, rnd) {
+  if (!R.holo) return;
+  const g = holoFill(c, 0, 0, W, H, R);
+  c.save(); c.globalCompositeOperation = 'soft-light'; c.fillStyle = g;
+  // 枠
+  c.beginPath(); c.roundRect(0, 0, W, H, 46); c.roundRect(P, P, W - P * 2, H - P * 2, 28);
+  c.globalAlpha = R.holo; c.fill('evenodd');
+  // イラスト
+  c.globalAlpha = R.holo * .55; rr(c, art.x, art.y, art.w, art.h, 18); c.fill();
+  // 文字の欄
+  c.globalAlpha = R.holo * .08; rr(c, P, P, W - P * 2, H - P * 2, 28); c.fill();
+  c.globalCompositeOperation = 'lighter'; c.globalAlpha = 1;
+  for (let i = 0; i < 6 + R.stars * 6; i++) {
+    const onFrame = rnd() < .6, sx = rnd() * W, sy = rnd() * H;
+    if (onFrame) sparkle(c, sx < W / 2 ? P / 2 + rnd() * 4 : W - P / 2 - rnd() * 4, sy, 4 + rnd() * 6, `rgba(255,255,255,${.4 + rnd() * .5})`);
+    else sparkle(c, art.x + rnd() * art.w, art.y + rnd() * art.h * .6, 3 + rnd() * 6, `rgba(255,255,255,${.3 + rnd() * .5})`);
+  }
+  c.restore();
+}
+
+function tcgDate() { const d = new Date(); return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`; }
+async function loadCardFonts() {
+  await Promise.all(['900 40px Outfit', '800 40px Outfit', '600 40px Outfit', '900 40px "Zen Kaku Gothic New"', '700 40px "Zen Kaku Gothic New"', '500 40px "Zen Kaku Gothic New"']
+    .map(f => document.fonts.load(f, 'MMみなとみらい認定証0123★').catch(() => null)));
+}
+
+// カードのおもて面
+function drawCardFront() {
+  const cv = document.createElement('canvas'); cv.width = TCG_W; cv.height = TCG_H;
+  const c = cv.getContext('2d');
+  const total = G.total, rk = rankOf(total), R = rarityOf(rk), clear = total >= CLEAR_SCORE;
+  const rnd = seeded(total * 7 + rk.letter.charCodeAt(0));
+  const W = TCG_W, H = TCG_H, P = 30;
+  // 外枠（金属）
+  rr(c, 0, 0, W, H, 46); c.fillStyle = metal(c, 0, 0, W, H, R.frame); c.fill();
+  c.save(); rr(c, 0, 0, W, H, 46); c.clip(); c.globalCompositeOperation = 'overlay';
+  for (let i = -H; i < W; i += 26) { c.strokeStyle = i % 52 ? 'rgba(255,255,255,.22)' : 'rgba(0,0,0,.15)'; c.lineWidth = 9; c.beginPath(); c.moveTo(i, 0); c.lineTo(i + H, H); c.stroke(); }
+  c.restore();
+  // 内側のパネル
+  rr(c, P, P, W - P * 2, H - P * 2, 28); c.fillStyle = lin(c, 0, P, 0, H - P, R.panel); c.fill();
+  c.save(); rr(c, P, P, W - P * 2, H - P * 2, 28); c.clip(); c.strokeStyle = 'rgba(255,255,255,.025)'; c.lineWidth = 2;
+  for (let i = -H; i < W; i += 14) { c.beginPath(); c.moveTo(i, P); c.lineTo(i + H, H); c.stroke(); }
+  c.restore();
+  c.strokeStyle = 'rgba(0,0,0,.45)'; c.lineWidth = 3; rr(c, P, P, W - P * 2, H - P * 2, 28); c.stroke();
+  const L = P + 26, Rt = W - P - 26, IW = Rt - L;
+  // 見出し：レベル・称号・スコア
+  rr(c, L, 52, 112, 54, 27); c.fillStyle = lin(c, L, 52, L + 112, 106, [R.frame[0], R.frame[2]]); c.fill();
+  c.strokeStyle = 'rgba(0,0,0,.35)'; c.lineWidth = 2; c.stroke();
+  c.fillStyle = R.ink; c.font = `900 30px ${EN}`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(`Lv.${rk.lv}`, L + 56, 80);
+  c.textAlign = 'right'; c.textBaseline = 'alphabetic';
+  c.font = `700 15px ${EN}`; c.fillStyle = 'rgba(255,255,255,.6)'; c.fillText('SCORE', Rt, 66);
+  c.font = `900 44px ${EN}`; c.fillStyle = R.accent; c.fillText(total.toLocaleString(), Rt, 108);
+  const scoreW = c.measureText(total.toLocaleString()).width;
+  const tx = L + 128, tw = Rt - scoreW - 24 - tx;
+  const ts = fitFont(c, rk.title, 900, JP, 46, tw, 24);
+  c.textAlign = 'left'; c.fillStyle = '#ffffff'; c.shadowColor = 'rgba(0,0,0,.5)'; c.shadowBlur = 6; c.fillText(rk.title, tx, 80 + ts * .36); c.shadowBlur = 0;
+  // イラスト
+  const ay = 124, ah = 486;
+  c.fillStyle = metal(c, L - 8, ay - 8, IW + 16, ah + 16, R.frame); rr(c, L - 8, ay - 8, IW + 16, ah + 16, 24); c.fill();
+  drawArt(c, L, ay, IW, ah, R, rnd);
+  // ランクの紋章（イラスト右下）
+  const ex = Rt - 84, ey = ay + ah - 84;
+  c.save(); c.shadowColor = 'rgba(0,0,0,.6)'; c.shadowBlur = 24;
+  c.beginPath(); for (let i = 0; i < 6; i++) { const a = Math.PI / 6 + i * Math.PI / 3; c.lineTo(ex + Math.cos(a) * 74, ey + Math.sin(a) * 74); } c.closePath();
+  c.fillStyle = metal(c, ex - 74, ey - 74, 148, 148, R.frame); c.fill(); c.restore();
+  c.beginPath(); for (let i = 0; i < 6; i++) { const a = Math.PI / 6 + i * Math.PI / 3; c.lineTo(ex + Math.cos(a) * 60, ey + Math.sin(a) * 60); } c.closePath();
+  c.fillStyle = lin(c, 0, ey - 60, 0, ey + 60, R.panel); c.fill();
+  c.fillStyle = R.accent; c.font = `900 84px ${EN}`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(rk.letter, ex, ey + 6);
+  c.font = `800 13px ${EN}`; c.fillStyle = 'rgba(255,255,255,.75)'; c.fillText('RANK', ex, ey - 40);
+  // レア度の帯（イラスト左上）
+  c.textAlign = 'left';
+  const tag = `${R.code}  ${'★'.repeat(R.stars)}`;
+  c.font = `900 22px ${EN}`; const tgw = c.measureText(tag).width + 30;
+  rr(c, L + 14, ay + 14, tgw, 40, 20); c.fillStyle = 'rgba(5,8,18,.6)'; c.fill();
+  c.strokeStyle = R.accent; c.lineWidth = 2; c.stroke();
+  c.fillStyle = R.accent; c.textBaseline = 'middle'; c.fillText(tag, L + 29, ay + 35);
+  // 情報の帯
+  const by = ay + ah + 18;
+  rr(c, L, by, IW, 38, 19); c.fillStyle = 'rgba(0,0,0,.38)'; c.fill();
+  c.strokeStyle = metal(c, L, by, IW, 38, R.frame); c.lineWidth = 2; c.stroke();
+  const pitari = G.rounds.filter(r => r.guess && r.dist <= PERFECT_M).length;
+  c.font = `700 18px ${JP}`; c.fillStyle = 'rgba(255,255,255,.85)'; c.textAlign = 'center';
+  c.fillText(`${THEMES[G.theme].name}・${G.useSV ? 'ストリートビュー' : '写真'}　｜　${tcgDate()}`, W / 2, by + 20);
+  // 5問（わざの欄のように並べる）
+  let y = by + 54; const rh = 60;
+  G.rounds.forEach((r, i) => {
+    const cls = r.guess ? gradeOf(r.dist).cls : 'g-e', cyy = y + rh / 2;
+    c.fillStyle = GRADE_COLOR[cls]; c.beginPath(); c.arc(L + 24, cyy, 22, 0, Math.PI * 2); c.fill();
+    c.strokeStyle = 'rgba(255,255,255,.7)'; c.lineWidth = 2.5; c.stroke();
+    c.fillStyle = '#10182a'; c.font = `900 24px ${EN}`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(String(i + 1), L + 24, cyy + 1);
+    c.textAlign = 'right'; c.textBaseline = 'alphabetic';
+    c.font = `600 16px ${EN}`; c.fillStyle = 'rgba(255,255,255,.5)'; c.fillText('pt', Rt, cyy + 13);
+    c.font = `900 36px ${EN}`; c.fillStyle = '#ffffff'; c.fillText(r.score.toLocaleString(), Rt - 22, cyy + 13);
+    c.textAlign = 'left';
+    c.font = `900 27px ${JP}`; c.fillStyle = '#ffffff'; c.fillText(clip(c, r.spot.name, IW - 64 - 150), L + 60, cyy - 2);
+    c.font = `500 17px ${JP}`; c.fillStyle = 'rgba(255,255,255,.6)';
+    c.fillText(r.guess ? `${gradeOf(r.dist).name}　${fmtDist(r.dist).join('')}` : '時間切れ', L + 60, cyy + 22);
+    if (i < 4) { c.fillStyle = 'rgba(255,255,255,.1)'; c.fillRect(L, y + rh, IW, 1.5); }
+    y += rh;
+  });
+  // ステータス3つ
+  y += 10;
+  const dexN = Object.keys(getDex()).filter(k => SPOTS[k]).length, bw = (IW - 24) / 3;
+  [['クリア', clear ? 'CLEAR' : `あと${(CLEAR_SCORE - total).toLocaleString()}`, clear ? '#4fe3a3' : '#ffffff'],
+   ['ピタリ', `${pitari} / 5`, '#ffd25e'],
+   ['図鑑', `${dexN} / ${window.MM_SPOTS.length}`, '#6fd0ff']].forEach(([k, v, col], i) => {
+    const bx = L + i * (bw + 12);
+    rr(c, bx, y, bw, 48, 12); c.fillStyle = 'rgba(0,0,0,.32)'; c.fill();
+    c.textBaseline = 'middle'; c.textAlign = 'left'; c.font = `700 16px ${JP}`; c.fillStyle = 'rgba(255,255,255,.55)'; c.fillText(k, bx + 14, y + 25);
+    c.textAlign = 'right'; c.font = `900 ${fitFont(c, v, 900, EN, 24, bw - 80, 14)}px ${EN}`; c.fillStyle = col; c.fillText(v, bx + bw - 14, y + 25);
+  });
+  // ひとこと（フレーバーテキスト）
+  y += 62;
+  const fh = H - P - 64 - y;
+  rr(c, L, y, IW, fh, 14); c.fillStyle = 'rgba(255,255,255,.05)'; c.fill(); c.strokeStyle = R.accent; c.globalAlpha = .45; c.lineWidth = 1.5; c.stroke(); c.globalAlpha = 1;
+  c.font = `500 22px ${JP}`; c.fillStyle = 'rgba(255,255,255,.85)'; c.textAlign = 'left'; c.textBaseline = 'middle';
+  const lines = wrapLines(c, rk.msg, IW - 40, 2);
+  lines.forEach((ln, i) => c.fillText(ln, L + 20, y + fh / 2 + (i - (lines.length - 1) / 2) * 32));
+  // フッター
+  const fy = H - P - 30;
+  c.font = `800 17px ${EN}`; c.fillStyle = R.accent; c.textAlign = 'left'; c.fillText(CONFIG.appName, L, fy);
+  const an = c.measureText(CONFIG.appName).width;
+  c.font = `500 15px ${JP}`; c.fillStyle = 'rgba(255,255,255,.5)'; c.fillText('みなとみらい認定カード', L + an + 14, fy);
+  c.textAlign = 'right'; c.font = `800 17px ${EN}`; c.fillStyle = R.accent; c.fillText(`${R.code} ${'★'.repeat(R.stars)}`, Rt, fy);
+  // ホロ（UR は枠ごと、ほかはカード全体にうっすら）
+  drawHolo(c, W, H, P, { x: L, y: ay, w: IW, h: ah }, R, rnd);
+  if (R.legend) {
+    c.save(); c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = `900 15px ${EN}`; c.fillStyle = R.ink;
+    c.fillText('L E G E N D', W / 2, 15); c.restore();
+  }
+  return cv;
+}
+
+// カードのうら面（どのランクでも共通）
+function drawCardBack() {
+  const cv = document.createElement('canvas'); cv.width = TCG_W; cv.height = TCG_H;
+  const c = cv.getContext('2d'), W = TCG_W, H = TCG_H;
+  rr(c, 0, 0, W, H, 46); c.fillStyle = metal(c, 0, 0, W, H, ['#13284d', '#0a1730', '#1c3a6a', '#0a1730']); c.fill();
+  rr(c, 30, 30, W - 60, H - 60, 28); c.fillStyle = lin(c, 0, 30, 0, H - 30, ['#0d2347', '#071228', '#0d2347']); c.fill();
+  c.strokeStyle = 'rgba(255,210,94,.7)'; c.lineWidth = 3; c.stroke();
+  c.save(); rr(c, 30, 30, W - 60, H - 60, 28); c.clip();
+  // 波の模様
+  c.strokeStyle = 'rgba(63,216,255,.09)'; c.lineWidth = 2;
+  for (let yy = 40; yy < H; yy += 22) { c.beginPath(); for (let xx = 0; xx <= W; xx += 10) c.lineTo(xx, yy + Math.sin(xx / 38 + yy / 50) * 6); c.stroke(); }
+  const cx = W / 2, cy = H / 2;
+  const glow = c.createRadialGradient(cx, cy, 0, cx, cy, 420); glow.addColorStop(0, 'rgba(255,77,126,.35)'); glow.addColorStop(1, 'rgba(255,77,126,0)');
+  c.fillStyle = glow; c.fillRect(0, 0, W, H);
+  // 羅針盤
+  [300, 262, 200].forEach((r, i) => { c.strokeStyle = i === 1 ? 'rgba(255,210,94,.75)' : 'rgba(255,210,94,.3)'; c.lineWidth = i === 1 ? 3 : 1.5; c.beginPath(); c.arc(cx, cy, r, 0, Math.PI * 2); c.stroke(); });
+  for (let i = 0; i < 72; i++) { const a = i / 72 * Math.PI * 2, l = i % 9 ? 8 : 20; c.strokeStyle = 'rgba(255,210,94,.55)'; c.lineWidth = 2; c.beginPath(); c.moveTo(cx + Math.cos(a) * 262, cy + Math.sin(a) * 262); c.lineTo(cx + Math.cos(a) * (262 - l), cy + Math.sin(a) * (262 - l)); c.stroke(); }
+  [[0, 330], [Math.PI / 2, 250], [Math.PI, 250], [Math.PI * 1.5, 330]].forEach(([a, l]) => {
+    c.fillStyle = 'rgba(255,210,94,.16)'; c.beginPath(); c.moveTo(cx + Math.cos(a - Math.PI / 2) * l, cy + Math.sin(a - Math.PI / 2) * l);
+    c.lineTo(cx + Math.cos(a - Math.PI / 2 + .12) * 60, cy + Math.sin(a - Math.PI / 2 + .12) * 60); c.lineTo(cx, cy); c.lineTo(cx + Math.cos(a - Math.PI / 2 - .12) * 60, cy + Math.sin(a - Math.PI / 2 - .12) * 60); c.closePath(); c.fill();
+  });
+  // 円周の文字
+  const ring = '★ MINATO MIRAI 21 ★ YOKOHAMA ★ MINATO MIRAI 21 ★ YOKOHAMA ';
+  c.font = `800 22px ${EN}`; c.fillStyle = 'rgba(255,210,94,.8)'; c.textAlign = 'center'; c.textBaseline = 'middle';
+  [...ring].forEach((ch, i) => { const a = i / ring.length * Math.PI * 2 - Math.PI / 2; c.save(); c.translate(cx + Math.cos(a) * 282, cy + Math.sin(a) * 282); c.rotate(a + Math.PI / 2); c.fillText(ch, 0, 0); c.restore(); });
+  // ロゴ
+  const lf = fitFont(c, CONFIG.appName, 900, EN, 110, 520, 40);
+  c.fillStyle = lin(c, cx - 260, 0, cx + 260, 0, ['#ff4d7e', '#ff8a5b', '#ffd25e']); c.shadowColor = 'rgba(255,77,126,.6)'; c.shadowBlur = 30;
+  c.fillText(CONFIG.appName, cx, cy - 8); c.shadowBlur = 0;
+  c.font = `700 24px ${JP}`; c.fillStyle = 'rgba(255,255,255,.8)'; c.fillText('みなとみらい認定カード', cx, cy + lf * .55 + 6);
+  c.restore();
+  return cv;
+}
+
+// 保存・シェア用：カードを台紙（1080×1350）に載せる
+function drawStage(front) {
+  const cv = document.createElement('canvas'); cv.width = STAGE_W; cv.height = STAGE_H;
+  const c = cv.getContext('2d'), rk = rankOf(G.total), R = rarityOf(rk), rnd = seeded(G.total + 99);
+  c.fillStyle = lin(c, 0, 0, 0, STAGE_H, ['#0b1730', '#04080f']); c.fillRect(0, 0, STAGE_W, STAGE_H);
+  const cx = STAGE_W / 2, cy = 600;
+  // 後光（SR 以上）
+  if (R.stars >= 3) {
+    c.save(); c.translate(cx, cy); c.globalCompositeOperation = 'lighter';
+    const n = R.legend ? 28 : 20;
+    for (let i = 0; i < n; i++) {
+      c.rotate(Math.PI * 2 / n); c.fillStyle = i % 2 ? `${R.accent}14` : `${R.accent}08`;
+      c.beginPath(); c.moveTo(0, 0); c.lineTo(-90, -1100); c.lineTo(90, -1100); c.closePath(); c.fill();
+    }
+    c.restore();
+  }
+  const gl = c.createRadialGradient(cx, cy, 0, cx, cy, 640); gl.addColorStop(0, `${R.accent}55`); gl.addColorStop(1, `${R.accent}00`);
+  c.fillStyle = gl; c.fillRect(0, 0, STAGE_W, STAGE_H);
+  for (let i = 0; i < 10 + R.stars * 10; i++) sparkle(c, rnd() * STAGE_W, rnd() * STAGE_H, 3 + rnd() * 9, `rgba(255,255,255,${.2 + rnd() * .5})`);
+  // カード（少し傾けて影をつける）
+  const s = .88, cw = TCG_W * s, ch = TCG_H * s;
+  c.save(); c.translate(cx, 52 + ch / 2); c.rotate(-1.5 * Math.PI / 180);
+  c.shadowColor = 'rgba(0,0,0,.65)'; c.shadowBlur = 60; c.shadowOffsetY = 28;
+  c.drawImage(front, -cw / 2, -ch / 2, cw, ch);
+  c.restore();
+  c.textAlign = 'center'; c.textBaseline = 'alphabetic';
+  c.font = `900 34px ${JP}`; c.fillStyle = '#ffffff'; c.fillText('あなたは何ランク？', cx, 1258);
+  c.font = `600 24px ${EN}`; c.fillStyle = '#3fd8ff'; c.fillText(shareUrl(), cx, 1300);
+  return cv;
+}
+
+let cardBlob = null, cardBusy = false;
+const toBlob = cv => new Promise(res => cv.toBlob(res, 'image/png'));
+async function openCard() {
+  if (!G || cardBusy) return;
+  cardBusy = true; cardBlob = null;
+  const tcg = $('tcg'), m = $('cardModal'), R = rarityOf(rankOf(G.total));
+  tcg.classList.remove('flipped'); tcg.dataset.r = R.code; tcg.style.setProperty('--accent', R.accent);
+  m.classList.add('busy'); openModal('cardModal');
+  await loadCardFonts();
+  const front = drawCardFront(), back = drawCardBack();
+  $('cardBack').src = back.toDataURL('image/png');
+  const fb = await toBlob(front);
+  const img = $('cardImg');
+  if (img.dataset.url) URL.revokeObjectURL(img.dataset.url);
+  img.dataset.url = URL.createObjectURL(fb); img.src = img.dataset.url;
+  await img.decode().catch(() => null);
+  m.classList.remove('busy');
+  $('cardRarity').textContent = `${R.code}（${R.name}）`;
+  // うら → おもてにめくる
+  setTimeout(() => {
+    tcg.classList.add('flipped'); Snd.stamp();
+    if (R.stars >= 3) setTimeout(() => Snd.great(), 350);
+    if (R.stars >= 4) setTimeout(() => Confetti.burst(R.legend ? 320 : 200), 450);
+  }, 500);
+  cardBlob = await toBlob(drawStage(front));
+  const file = new File([cardBlob], 'mm-guessr.png', { type: 'image/png' });
+  $('cardShare').hidden = !(navigator.canShare && navigator.canShare({ files: [file] }));
+  cardBusy = false;
+}
+function cardFileName() {
+  const d = new Date(); return `mm-guessr_${rankOf(G.total).letter}_${G.total}_${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}.png`;
+}
+$('cardSave').addEventListener('click', () => {
+  if (!cardBlob) return;
+  Snd.click();
+  const u = URL.createObjectURL(cardBlob);
+  const a = document.createElement('a'); a.href = u; a.download = cardFileName(); document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(u), 4000);
+  toast('画像を保存しました');
+});
+$('cardShare').addEventListener('click', async () => {
+  if (!cardBlob) return;
+  Snd.click();
+  const file = new File([cardBlob], cardFileName(), { type: 'image/png' });
+  try { await navigator.share({ files: [file], text: shareText() + '\nhttps://' + shareUrl() + '/' }); }
+  catch (e) { if (e.name !== 'AbortError') toast('共有できませんでした。保存してから送ってください'); }
+});
+// カードを傾けるとホロが動く
+(() => {
+  const st = $('tcgStage'), tcg = $('tcg');
+  const move = e => {
+    const b = tcg.getBoundingClientRect(), px = Math.min(1, Math.max(0, (e.clientX - b.left) / b.width)), py = Math.min(1, Math.max(0, (e.clientY - b.top) / b.height));
+    tcg.style.setProperty('--ry', ((px - .5) * 26).toFixed(1) + 'deg'); tcg.style.setProperty('--rx', ((.5 - py) * 22).toFixed(1) + 'deg');
+    tcg.style.setProperty('--mx', (px * 100).toFixed(1) + '%'); tcg.style.setProperty('--my', (py * 100).toFixed(1) + '%');
+    tcg.classList.add('active');
+  };
+  st.addEventListener('pointermove', move);
+  st.addEventListener('pointerdown', move);
+  st.addEventListener('pointerleave', () => { tcg.classList.remove('active'); ['--rx', '--ry'].forEach(k => tcg.style.setProperty(k, '0deg')); });
+})();
 
 // ===================== 画面切り替え・タイトル =====================
 function setPhase(p) {
@@ -976,7 +1394,8 @@ function syncMute() { $('muteBtn').classList.toggle('off', !settings.sound); }
 document.querySelectorAll('.theme').forEach(b => b.addEventListener('click', () => startGame(b.dataset.theme)));
 $('againBtn').addEventListener('click', () => startGame(G ? G.theme : lastTheme));
 $('homeBtn').addEventListener('click', () => { Snd.click(); setPhase('title'); });
-$('shareBtn').addEventListener('click', copyShare);
+$('shareBtn').addEventListener('click', () => { Snd.click(); openCard(); });
+$('cardCopy').addEventListener('click', copyShare);
 $('rulesBtn').addEventListener('click', openRules);
 $('rulesBtn2').addEventListener('click', openRules);
 $('dexBtn').addEventListener('click', () => { Snd.init(); Snd.click(); openDex(); });
@@ -1016,7 +1435,7 @@ addEventListener('keydown', e => {
 
 // ===================== 起動 =====================
 // 動作確認用（コンソールから __mmg.G や __mmg.map を見られる）
-window.__mmg = { get G() { return G; }, map, SV, Seen, guess: (lat, lng) => placeGuess({ lat, lng }) };
+window.__mmg = { get G() { return G; }, map, SV, Seen, guess: (lat, lng) => placeGuess({ lat, lng }), card: { drawCardFront, drawCardBack, drawStage } };
 document.title = `${CONFIG.appName}｜みなとみらいジオゲッサー`;
 $('logo').textContent = CONFIG.appName; $('logo').setAttribute('aria-label', CONFIG.appName);
 splitLogo();

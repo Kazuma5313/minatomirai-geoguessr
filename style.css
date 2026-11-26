@@ -447,3 +447,49 @@ body.revealing .dock-3d{display:none}
 .final-head .final-total b{font-size:58px}
 .final-head .final-total span{font-size:15px}
 @media (max-width:760px){.final-letter{width:72px;height:72px;font-size:48px;border-radius:20px}.final-head .final-total b{font-size:46px}}
+
+/* 認定証カード */
+.btn-card{flex:1 1 100%;display:flex;align-items:center;justify-content:center;gap:12px;padding:14px 20px;border-radius:999px;cursor:pointer;
+  font:inherit;font-weight:900;font-size:17px;color:var(--gold);background:rgba(255,210,94,.08);border:1.5px solid rgba(255,210,94,.6);transition:.2s}
+.btn-card small{font-weight:500;font-size:12px;color:var(--dim)}
+.btn-card:hover{background:rgba(255,210,94,.16);transform:translateY(-1px)}
+.modal-box.card{width:min(560px,100%);display:flex;flex-direction:column;overflow:hidden}
+.tcg-stage{position:relative;display:grid;place-items:center;padding:8px 22px 4px;perspective:1600px;touch-action:none}
+.tcg{position:relative;width:min(100%,calc((100vh - 290px) * .714));aspect-ratio:900/1260;transform-style:preserve-3d;
+  transform:rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg));transition:transform .5s var(--ease)}
+.tcg.active{transition:transform .08s linear}
+.tcg-inner{position:absolute;inset:0;transform-style:preserve-3d;transform:rotateY(180deg) scale(.92)}
+.tcg.flipped .tcg-inner{transform:none;transition:transform 1.1s var(--spring)}
+.tcg-face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:5.1%/3.65%;overflow:hidden;
+  filter:drop-shadow(0 18px 30px rgba(0,0,0,.55))}
+.tcg-face img{display:block;width:100%;height:100%}
+.tcg-face img:not([src]){visibility:hidden}
+.tcg-back{transform:rotateY(180deg)}
+.tcg-holo,.tcg-glare{position:absolute;inset:0;pointer-events:none;border-radius:inherit}
+.tcg-holo{opacity:0;mix-blend-mode:color-dodge;transition:opacity .3s;
+  background:repeating-linear-gradient(115deg,#ff6fa8 0%,#ffd25e 7%,#5cffb4 14%,#3fd8ff 21%,#a77bff 28%,#ff6fa8 35%);
+  background-size:300% 300%;background-position:var(--mx,50%) var(--my,50%)}
+.tcg-glare{opacity:0;mix-blend-mode:overlay;transition:opacity .3s;
+  background:radial-gradient(circle at var(--mx,50%) var(--my,50%),rgba(255,255,255,.75),rgba(255,255,255,0) 45%)}
+.tcg.flipped .tcg-glare{opacity:.55}
+.tcg.flipped[data-r="R"] .tcg-holo{opacity:.07}
+.tcg.flipped[data-r="SR"] .tcg-holo{opacity:.11}
+.tcg.flipped[data-r="SSR"] .tcg-holo{opacity:.16}
+.tcg.flipped[data-r="UR"] .tcg-holo{opacity:.22}
+.tcg.flipped[data-r="N"] .tcg-glare{opacity:.3}
+.tcg-burst{position:absolute;inset:-30%;border-radius:50%;transform:translateZ(-40px) scale(.3);opacity:0;
+  background:radial-gradient(circle,var(--accent,#fff) 0%,transparent 62%)}
+.tcg.flipped .tcg-burst{animation:tcgBurst 1.4s var(--ease) .15s forwards}
+.tcg.flipped:not([data-r="N"]) .tcg-burst{animation:tcgBurst 1.4s var(--ease) .15s forwards,tcgPulse 3s ease-in-out 1.6s infinite}
+@keyframes tcgBurst{0%{opacity:0;transform:translateZ(-40px) scale(.3)}35%{opacity:.85}100%{opacity:.28;transform:translateZ(-40px) scale(1)}}
+@keyframes tcgPulse{50%{opacity:.45}}
+.tcg-stage .card-spin{position:absolute;inset:0;margin:auto;width:36px;height:36px;border-radius:50%;border:3px solid rgba(255,255,255,.15);border-top-color:var(--cyan);animation:spin 1s linear infinite;display:none}
+#cardModal.busy .card-spin{display:block}
+@keyframes spin{to{transform:rotate(360deg)}}
+.tcg-rarity{margin:10px 22px 0;text-align:center;font-size:14px;color:var(--dim)}
+.tcg-rarity b{color:var(--gold);font-family:Outfit,inherit;margin:0 4px}
+.tcg-rarity span{display:block;font-size:12px;margin-top:2px;opacity:.7}
+.btn-card[data-r="SSR"],.btn-card[data-r="UR"]{background:linear-gradient(100deg,rgba(255,77,126,.18),rgba(255,210,94,.18));animation:readyGlow 1.6s infinite}
+.card-actions{display:flex;flex-wrap:wrap;gap:10px;padding:16px 22px 22px}
+.card-actions .btn-primary{flex:1 1 100%;padding:14px 20px;font-size:17px}
+.card-actions .btn-ghost{flex:1}
